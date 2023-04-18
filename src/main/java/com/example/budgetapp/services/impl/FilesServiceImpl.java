@@ -46,7 +46,8 @@ public class FilesServiceImpl implements FilesService {
     //служебные методы, приватные, нужны чтобы сервис норм работал
     //1. для удаления файла; 2.
     //нужно писать чек ресепшен
-    private boolean cleanDataFile () {
+    @Override
+    public boolean cleanDataFile () {
         try {
             Path path = Path.of(dataFilePath,dataFileName);
             Files.deleteIfExists(path);                      //метод- удалить если существует файл, Path.of передаем строку с нашей папкой
@@ -57,10 +58,12 @@ public class FilesServiceImpl implements FilesService {
             return false;
         }
     }
-    //
-//    public File getDataFile() {
-//
-//    }
+    //метод возвращающий файл (по сути возвр не сам файл, самих данных файлов не касаемся)
+    @Override
+    public File getDataFile() {
+        return new File(dataFilePath + "/" + dataFileName);
+
+    }
 
 
 
