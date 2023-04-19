@@ -46,7 +46,8 @@ public class FilesServiceImpl implements FilesService {
     //служебные методы, приватные, нужны чтобы сервис норм работал
     //1. для удаления файла; 2.
     //нужно писать чек ресепшен
-    private boolean cleanDataFile () {
+    @Override
+    public boolean cleanDataFile () {
         try {
             Path path = Path.of(dataFilePath,dataFileName);
             Files.deleteIfExists(path);                      //метод- удалить если существует файл, Path.of передаем строку с нашей папкой
@@ -57,10 +58,23 @@ public class FilesServiceImpl implements FilesService {
             return false;
         }
     }
-    //
-//    public File getDataFile() {
-//
-//    }
+
+    @Override
+    public Path createTempFile(String suffix) {
+        try {
+            return Files.createTempFile(Path.of(dataFilePath), "tempFile", suffix);   //файл временый тк будет генерируется автомотичиски у него состовное название - сначала идет префикс + случайное число и потом суффикс (избегаем одинаковых имен)
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    //метод возвращающий файл (по сути возвр не сам файл, самих данных файлов не касаемся)
+    @Override
+    public File getDataFile() {
+        return new File(dataFilePath + "/" + dataFileName);
+
+    }
 
 
 

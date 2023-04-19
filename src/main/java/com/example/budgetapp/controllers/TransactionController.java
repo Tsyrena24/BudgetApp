@@ -12,10 +12,19 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Month;
+import java.util.LinkedHashMap;
 
 @RestController
 @RequestMapping("/transaction")
@@ -76,8 +85,33 @@ public class TransactionController {
 
     //Метод только по месяцам, и обязательно у казвать в юрл
     @GetMapping("/byMonth/{month}")
-    public ResponseEntity<Transaction> getTransactionsMonth(@PathVariable Month month) {
-        return null;
+    public ResponseEntity<Object> getTransactionsMonth(@PathVariable Month month) {
+        try {
+            Path path = budgetServices.createMonthlyReport(month);
+            if (Files.size(path) == 0) {
+                return ResponseEntity.noContent().build();  //в ок, но содержимого нет
+            }
+            InputStreamResource resource = new InputStreamResource(new FileInputStream(path.toFile()));   //создание потока. InputStreamResource некая обертка в которую мы кладем в FileInputStream (входной поток стрим)
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_PLAIN)  //ЗАГОЛОВОК ЗАПРОСА URL: TEXT_PLAIN - текстовый файл
+                    .contentLength(Files.size(path))    //ЗАГОЛОВОК ЗАПРОСА URL: передает длину файла
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + month + "-report.txt\"") //ЗАГОЛОВОК ЗАПРОСА URL: CONTENT_DISPOSITION есть инфа что это за контент (attachment - показывает что нужно скачивать, filename - скачать с опред названием)
+                    .body(resource);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(e.toString());
+        }
+    }
+
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Object> addTransactionsFromFile (@RequestParam MultipartFile file) {
+        try (InputStream stream = file.getInputStream()) {
+            budgetServices.addTransactionFromInputStream(file.getInputStream());
+            return ResponseEntity.ok().build();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(e.toString());
+        }
     }
 
     @PutMapping("/{id}")
