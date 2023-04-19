@@ -1,19 +1,27 @@
 package com.example.budgetapp.services.impl;
 
+import com.example.budgetapp.model.Category;
 import com.example.budgetapp.model.Transaction;
 import com.example.budgetapp.services.BudgetServices;
 import com.example.budgetapp.services.FilesService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 import javax.annotation.PostConstruct;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.time.Month;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 @Service
 public class BudgetServicesImpl implements BudgetServices {
@@ -40,8 +48,11 @@ public class BudgetServicesImpl implements BudgetServices {
 
     @PostConstruct   //спинг автоматически вызывет этот метот в тот момент когда этот пин будет создан ()
     private void init() {
-        readFromFile();
-
+        try {
+            readFromFile();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -116,6 +127,36 @@ public class BudgetServicesImpl implements BudgetServices {
             return sum;
         }
 
+    @Override
+    public Path createMonthlyReport(Month month) throws IOException {
+
+        LinkedHashMap<Long, Transaction> monthlyTransaction = transactions.getOrDefault(month, new LinkedHashMap<>());
+        Path path = filesService.createTempFile("monthlyReport");
+        for (Transaction transaction : monthlyTransaction.values()) {
+            try (Writer writer = Files.newBufferedWriter(path, StandardOpenOption.APPEND)) {
+                writer.append(transaction.getCategory().getText() + ": " + transaction.getSum() + " руб. - " + transaction.getComment());
+                writer.append("\n");
+            }
+        }
+        return path;
+    }
+
+
+    @Override
+    //добавление рецептов без удаления старого
+    public void addTransactionFromInputStream(InputStream inputStream) throws IOException {
+        //преобразовать байты в строку InputStreamReader
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))){
+            String line;
+            while ((line = reader.readLine())!= null) {
+                String[] array = StringUtils.split(line, '|');
+                Transaction transaction = new Transaction(Category.valueOf(array[0]), Integer.valueOf(array[1]), array[2]);
+                addTransaction(transaction);
+            }
+        }
+    }
+
+
         @Override
 
         public int getVacationBonus(int daysCount) {
@@ -135,7 +176,11 @@ public class BudgetServicesImpl implements BudgetServices {
     //работаем с библеотекой джексон(работает в json обьектами) writeValueAsString -> обьект переобразует в json
     private void saveToFile() {
         try {
-            String json = new ObjectMapper().writeValueAsString(transactions);
+             DataFile dataFile = new DataFile(lastId + 1, transactions);
+//            Map<String, Object> map = new HashMap<>();
+//            map.put("lastId", lastId);
+//            map.put("transactions", transactions);
+            String json = new ObjectMapper().writeValueAsString(dataFile);
             filesService.saveToFile(json);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
@@ -148,12 +193,26 @@ public class BudgetServicesImpl implements BudgetServices {
         //json -> преобрауем в обьект, испольуем класс TypeReference, внутри описывает какой конечный обьект
         try {
             String json = filesService.readToFile();
-            transactions = new ObjectMapper().readValue(json, new TypeReference<TreeMap<Month, LinkedHashMap<Long, Transaction>>>() {
-            });
+
+             DataFile dataFile = new ObjectMapper().readValue(json, new TypeReference<DataFile>(){
+             });
+            lastId = dataFile.getListId();
+            transactions = dataFile.getTransaction();
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
     }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    private static class DataFile {
+        private long listId;
+        private TreeMap<Month, LinkedHashMap<Long, Transaction>> transaction;
+
+
+    }
+
 
 
     }

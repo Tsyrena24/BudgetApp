@@ -58,6 +58,17 @@ public class FilesServiceImpl implements FilesService {
             return false;
         }
     }
+
+    @Override
+    public Path createTempFile(String suffix) {
+        try {
+            return Files.createTempFile(Path.of(dataFilePath), "tempFile", suffix);   //файл временый тк будет генерируется автомотичиски у него состовное название - сначала идет префикс + случайное число и потом суффикс (избегаем одинаковых имен)
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
     //метод возвращающий файл (по сути возвр не сам файл, самих данных файлов не касаемся)
     @Override
     public File getDataFile() {
